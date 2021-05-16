@@ -189,4 +189,15 @@ public class MeditationActivity extends AppCompatActivity {
             notificationManager.createNotificationChannel(channel);
         }
     }
+
+    public void resetCountDown(View v) {
+        TextView timerTextView = (TextView) findViewById(R.id.timerTextView);
+        timerTextView.setText("--");
+        timeLeft = getMillisecondsFromNumberPickers();
+        cancelCountdownNotification();
+        isTimerRunning = false;
+        Button button = (Button) findViewById(R.id.meditation_start_button);
+        button.setText("Start");
+        countDownTimer.cancel();
+    }
 }
