@@ -1,15 +1,25 @@
 package br.com.sdrx.pylon;
 
-        import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatActivity;
+        import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+        import android.app.NotificationManager;
+        import android.app.PendingIntent;
+        import android.content.Context;
+        import android.content.Intent;
         import android.media.Ringtone;
         import android.media.RingtoneManager;
         import android.net.Uri;
+        import android.os.Build;
         import android.os.Bundle;
         import android.os.CountDownTimer;
         import android.util.Log;
         import android.view.View;
-        import android.widget.TextView;
+import android.widget.NumberPicker;
+import android.widget.TextView;
         import android.widget.Toast;
         import android.widget.Button;
 
@@ -24,6 +34,7 @@ package br.com.sdrx.pylon;
         import java.util.Objects;
 
 public class MeditationActivity extends AppCompatActivity {
+    private static final String CHANNEL_ID = "pylon_notifications";
 
     private CountDownTimer countDownTimer;
     private long timeLeft = 1 * 10 * 1000; // 1 minute
@@ -33,14 +44,35 @@ public class MeditationActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_meditation);
-        TextView timerTextView = (TextView) findViewById(R.id.timerTextView);
-        timerTextView.setText(Objects.toString(new SimpleDateFormat("mm:ss").format(new Date(timeLeft))));
+        createNotificationChannel();
+        setNumberPickerValues();
+    }
+
+    private void setNumberPickerValues() {
+        NumberPicker minsNumberPicker = (NumberPicker) findViewById(R.id.meditation_numberpicker_minutes);
+        NumberPicker secsNumberPicker = (NumberPicker) findViewById(R.id.meditation_numberpicker_seconds);
+
+        minsNumberPicker.setMinValue(0);
+        minsNumberPicker.setMaxValue(100);
+        secsNumberPicker.setMinValue(0);
+        secsNumberPicker.setMaxValue(59);
+    }
+
+    private Long getMillisecondsFromNumberPickers() {
+        NumberPicker minsNumberPicker = (NumberPicker) findViewById(R.id.meditation_numberpicker_minutes);
+        NumberPicker secsNumberPicker = (NumberPicker) findViewById(R.id.meditation_numberpicker_seconds);
+
+        int mins = minsNumberPicker.getValue();
+        int secs = secsNumberPicker.getValue();
+
+        return (long) (mins * 60 * 1000) + (secs * 1000);
     }
 
     public void startMeditate(View view) {
         TextView timerTextView = (TextView) findViewById(R.id.timerTextView);
         Button button = (Button) view;
         if (!isTimerRunning) {
+            timeLeft = getMillisecondsFromNumberPickers();
             isTimerRunning = true;
             Toast.makeText(this, "Meditation Started", Toast.LENGTH_LONG).show();
             Toast toastDone = Toast.makeText(this, "Meditation Finished", Toast.LENGTH_LONG);
@@ -59,6 +91,7 @@ public class MeditationActivity extends AppCompatActivity {
                         Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
                         Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
                         r.play();
+                        cancelCountdownNotification();
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -109,11 +142,51 @@ public class MeditationActivity extends AppCompatActivity {
                     // HTTP - End
                 }
             }.start();
+
+            showCountdownNotification("Meditation is ongoing...");
         } else {
             isTimerRunning = false;
             Toast.makeText(this, "Meditation Paused", Toast.LENGTH_LONG).show();
             button.setText("Start");
             countDownTimer.cancel();
+            showCountdownNotification("Meditation is paused.");
+        }
+    }
+
+    private void showCountdownNotification(String text) {
+        NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_launcher_background)
+                .setContentTitle("[Pylon] Meditation")
+                .setContentText(text)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setOngoing(true);
+
+        Intent notificationIntent = new Intent(this, MeditationActivity.class);
+        PendingIntent notificationPendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        notificationBuilder.setContentIntent(notificationPendingIntent);
+
+        NotificationManagerCompat manager = NotificationManagerCompat.from(this);
+        manager.notify(0, notificationBuilder.build());
+    }
+
+    private void cancelCountdownNotification() {
+        NotificationManagerCompat manager = NotificationManagerCompat.from(this);
+        manager.cancel(0);
+    }
+
+    private void createNotificationChannel() {
+        // Create the NotificationChannel, but only on API 26+ because
+        // the NotificationChannel class is new and not in the support library
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CharSequence name = getString(R.string.channel_name);
+            String description = getString(R.string.channel_description);
+            int importance = NotificationManager.IMPORTANCE_DEFAULT;
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance);
+            channel.setDescription(description);
+            // Register the channel with the system; you can't change the importance
+            // or other notification behaviors after this
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            notificationManager.createNotificationChannel(channel);
         }
     }
 }
